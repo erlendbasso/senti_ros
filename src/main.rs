@@ -1,32 +1,3 @@
-// use tokio::net::UdpSocket;
-// use std::io;
-
-// #[tokio::main]
-// async fn main() -> io::Result<()> {
-    // let sock = UdpSocket::bind("0.0.0.0:6005").await?;
-    // // use `sock`
-    // let mut buf = vec![0; 10];
-    // let n = sock.recv(&mut buf).await?;
-
-    // println!("received {} bytes {:?}", n, &buf[..n]);
-//     Ok(())
-// }
-
-
-
-// use std::net::UdpSocket;
-
-// fn main() -> std::io::Result<()> {
-//     let socket = UdpSocket::bind("0.0.0.0:6005")?;
-//     let mut buf = [0; 1024];
-//     let (amt, src) = socket.recv_from(&mut buf)?;
-//     println!("Received {} bytes from {}", amt, src);
-//     println!("{}", String::from_utf8_lossy(&buf[..amt]));
-//     Ok(())
-// }
-// use tokio::net::UdpSocket;
-// use std::io;
-
 use tokio::{net::UdpSocket, sync::mpsc, task};
 // use std::net::UdpSocket;
 // use async_std::net::UdpSocket;
@@ -38,6 +9,8 @@ use serde::{Deserialize, Serialize};
 extern crate nalgebra as na;
 use na::{Vector3};
 
+use serde_yaml::{self};
+
 use r2r::{QosProfile, builtin_interfaces};
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -46,11 +19,24 @@ struct IMUData {
     pub ang_vel: Vector3<f32>,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+struct SentiROSConfig {
+    pub port: f64,
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let f = std::fs::File::open("config.yaml").expect("Could not open file.");
+    let cfg: SentiROSConfig =
+        serde_yaml::from_reader(f).expect("Could not parse file.");
 
-    // let sock = UdpSocket::bind("172.16.1.169:6005").await?;
-    let sock = UdpSocket::bind("0.0.0.0:6005").await?;
+
+    let port_str = cfg.port.to_string();
+    let mut addr = "0.0.0.0:".to_owned();
+    addr.push_str(&port_str);
+    
+    println!("Creating UDP socket and binding it to: {}", addr);
+    let sock = UdpSocket::bind(addr).await?;
     // sock.connect("172.16.1.170:6004");
     // use `sock`
     // let mut buf = vec![0; 10];
@@ -116,9 +102,9 @@ fn create_imu_ros_msg(imu_data: &IMUData) -> r2r::sensor_msgs::msg::Imu {
         z: ang_vel[2] as f64,      
       },
       linear_acceleration: r2r::geometry_msgs::msg::Vector3 {
+        x: lin_accel[0] as f64,
         y: lin_accel[1] as f64,
         z: lin_accel[2] as f64,      
-        x: lin_accel[0] as f64,
       },
       ..Default::default()
     }
